@@ -53,8 +53,9 @@ async function _init(props) {
   emojiVersion || (emojiVersion = PickerProps.emojiVersion.value)
   set || (set = PickerProps.set.value)
   locale || (locale = PickerProps.locale.value)
-
-  if (!Data) {
+  // PATCH: Always reinitialize data to support multiple picker instances with different configurations
+  // Store the base data if we haven't loaded it yet
+  if (!Data || props.data) {
     Data =
       (typeof props.data === 'function' ? await props.data() : props.data) ||
       (await fetchJSON(
@@ -64,10 +65,12 @@ async function _init(props) {
     Data.emoticons = {}
     Data.natives = {}
 
-    Data.categories.unshift({
-      id: 'frequent',
-      emojis: [],
-    })
+    if (!Data.categories.find((c) => c.id === 'frequent')) {
+      Data.categories.unshift({
+        id: 'frequent',
+        emojis: [],
+      })
+    }
 
     for (const alias in Data.aliases) {
       const emojiId = Data.aliases[alias]
@@ -78,13 +81,19 @@ async function _init(props) {
       emoji.aliases.push(alias)
     }
 
-    Data.originalCategories = Data.categories
+    if (!Data.originalCategories) {
+      Data.originalCategories = Data.categories
+    }
   } else {
+    // Reset categories to original state before filtering
+    Data.categories = Data.originalCategories
+      ? [...Data.originalCategories]
+      : Data.categories
+
+    // Filter out custom categories from previous instances
     Data.categories = Data.categories.filter((c) => {
       const isCustom = !!c.name
-      if (!isCustom) return true
-
-      return false
+      return !isCustom
     })
   }
 
